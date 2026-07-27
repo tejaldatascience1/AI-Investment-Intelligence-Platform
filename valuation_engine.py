@@ -1,8 +1,8 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: valuation_engine.py
-# Version: 1.4
-# Status: Stable
+# Version: 1.5
+# Status: Stable (With Fallback)
 # ==========================================
 
 import yfinance as yf
@@ -15,17 +15,22 @@ import requests
 
 def get_valuation_metrics(ticker):
     try:
-        # Custom session to bypass Yahoo Finance rate-limit / blocking
         session = requests.Session()
         session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
 
         stock = yf.Ticker(ticker, session=session)
-        
-        # Using stock.info with the session
         info = stock.info
 
+        current_price = info.get("currentPrice")
+        
+        # Fallback agar info dict empty ya block ho jaye
+        if current_price is None:
+            hist = stock.history(period="1d")
+            if not hist.empty:
+                current_price = float(hist["Close"].iloc[-1])
+
         valuation = {
-            "Current Price": info.get("currentPrice"),
+            "Current Price": current_price,
             "EPS": info.get("trailingEps"),
             "Book Value Per Share": info.get("bookValue"),
             "P/E Ratio": info.get("trailingPE"),
@@ -37,7 +42,6 @@ def get_valuation_metrics(ticker):
         return valuation
 
     except Exception as e:
-
         return {
             "Current Price": None,
             "EPS": None,
@@ -56,14 +60,12 @@ def get_valuation_metrics(ticker):
 # ----------------------------------
 
 def calculate_valuation_score(valuation):
-
     pe = valuation.get("P/E Ratio")
     pb = valuation.get("P/B Ratio")
 
     score = 0
     result = {}
 
-    # P/E Analysis
     if pe is not None:
         if pe < 15:
             score += 20
@@ -74,7 +76,6 @@ def calculate_valuation_score(valuation):
         else:
             result["P/E Status"] = "🔴 Overvalued"
 
-    # P/B Analysis
     if pb is not None:
         if pb < 1.5:
             score += 20
@@ -85,7 +86,6 @@ def calculate_valuation_score(valuation):
         else:
             result["P/B Status"] = "🔴 Overvalued"
 
-    # Overall Rating
     if score >= 35:
         overall = "🟢 Attractive Valuation"
     elif score >= 20:
@@ -105,7 +105,6 @@ def calculate_valuation_score(valuation):
 # ----------------------------------
 
 def calculate_basic_dcf(valuation):
-
     free_cash_flow = valuation.get("Free Cash Flow")
 
     if free_cash_flow is None:
@@ -131,7 +130,6 @@ def calculate_basic_dcf(valuation):
 # ----------------------------------
 
 def calculate_intrinsic_value(ticker, valuation):
-
     shares = valuation.get("Shares Outstanding")
     business_value = calculate_basic_dcf(valuation)
 
@@ -160,7 +158,6 @@ def calculate_intrinsic_value(ticker, valuation):
 # ----------------------------------
 
 def calculate_terminal_value(final_cash_flow):
-
     terminal_growth_rate = 0.03
     discount_rate = 0.10
 
@@ -179,7 +176,6 @@ def calculate_terminal_value(final_cash_flow):
 # ----------------------------------
 
 def calculate_enterprise_value(valuation):
-
     free_cash_flow = valuation.get("Free Cash Flow")
 
     if free_cash_flow is None:
@@ -209,7 +205,6 @@ def calculate_enterprise_value(valuation):
 # ----------------------------------
 
 def calculate_professional_intrinsic_value(ticker, valuation):
-
     shares = valuation.get("Shares Outstanding")
 
     if shares is None or shares == 0:
