@@ -5,4 +5,5 @@ plotly
 python-dotenv
 sqlalchemy
 pypdf
-yfinance
+requests
+yfinance>=0.2.40
