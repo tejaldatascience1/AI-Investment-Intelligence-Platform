@@ -155,10 +155,22 @@ if st.button("🚀 Generate Investment Intelligence"):
             valuation
         )
 
+        # Safety Check for Intrinsic Value & Margin of Safety
+        if intrinsic is not None:
+            margin_of_safety = intrinsic.get("Margin of Safety")
+            if margin_of_safety is None:
+                margin_of_safety = 0
+        else:
+            intrinsic = {
+                "Intrinsic Value": 0,
+                "Margin of Safety": 0
+            }
+            margin_of_safety = 0
+
         recommendation = generate_recommendation(
             financial_health["Financial Health Score"],
             valuation_result["Valuation Score"],
-            intrinsic["Margin of Safety"]
+            margin_of_safety
         )
 
     st.success("Analysis Completed Successfully ✅")
@@ -236,25 +248,29 @@ if st.button("🚀 Generate Investment Intelligence"):
     col1, col2 = st.columns(2)
 
     with col1:
+        current_price = valuation.get('Current Price')
         st.metric(
             "Current Price",
-            f"${valuation['Current Price']}"
+            f"${current_price}" if current_price is not None else "N/A"
         )
 
+        pe_ratio = valuation.get("P/E Ratio")
         st.metric(
             "P/E Ratio",
-            round(valuation["P/E Ratio"], 2)
+            round(pe_ratio, 2) if pe_ratio is not None else "N/A"
         )
 
     with col2:
+        book_value = valuation.get('Book Value Per Share')
         st.metric(
             "Book Value Per Share",
-            f"${round(valuation['Book Value Per Share'], 2)}"
+            f"${round(book_value, 2)}" if book_value is not None else "N/A"
         )
 
+        pb_ratio = valuation.get("P/B Ratio")
         st.metric(
             "P/B Ratio",
-            round(valuation["P/B Ratio"], 2)
+            round(pb_ratio, 2) if pb_ratio is not None else "N/A"
         )
 
     st.success(
@@ -268,15 +284,17 @@ if st.button("🚀 Generate Investment Intelligence"):
     col1, col2 = st.columns(2)
 
     with col1:
+        iv_val = intrinsic.get('Intrinsic Value', 0)
         st.metric(
             "Intrinsic Value",
-            f"${round(intrinsic['Intrinsic Value'], 2)}"
+            f"${round(iv_val, 2)}" if iv_val else "N/A"
         )
 
     with col2:
+        mos_val = intrinsic.get('Margin of Safety', 0)
         st.metric(
             "Margin of Safety",
-            f"{round(intrinsic['Margin of Safety'], 2)} %"
+            f"{round(mos_val, 2)} %" if mos_val else "N/A"
         )
 
     st.divider()
