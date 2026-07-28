@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 4.0 (Production Display & Native UI Polish Edition)
+# Version: 3.9 (Production Display & Native UI Polish Edition)
 # ==========================================
 
 import streamlit as st
@@ -36,43 +36,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# ----------------------------------
-# Helper Formatting Function
-# ----------------------------------
-
-def format_large_number(val, prefix="$", suffix=""):
-    """
-    Formats large financial numbers using professional notation:
-    1,250 -> 1.25K
-    2,500,000 -> 2.50M
-    3,450,000,000 -> 3.45B
-    1,200,000,000,000 -> 1.20T
-    Returns "Not Available" if value is None.
-    """
-    if val is None:
-        return "Not Available"
-    
-    try:
-        num = float(val)
-    except (TypeError, ValueError):
-        return "Not Available"
-    
-    abs_num = abs(num)
-    sign = "-" if num < 0 else ""
-    
-    if abs_num >= 1_000_000_000_000:
-        formatted = f"{abs_num / 1_000_000_000_000:.2f}T"
-    elif abs_num >= 1_000_000_000:
-        formatted = f"{abs_num / 1_000_000_000:.2f}B"
-    elif abs_num >= 1_000_000:
-        formatted = f"{abs_num / 1_000_000:.2f}M"
-    elif abs_num >= 1_000:
-        formatted = f"{abs_num / 1_000:.2f}K"
-    else:
-        formatted = f"{abs_num:.2f}"
-        
-    return f"{sign}{prefix}{formatted}{suffix}"
 
 # ----------------------------------
 # Cached Data Loaders for Speed Optimization
@@ -349,21 +312,21 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                 )
                 st.metric(
                     "Free Cash Flow",
-                    format_large_number(fcf_val, prefix="$")
+                    f"${fcf_val:,.0f}" if fcf_val is not None else "Not Available"
                 )
 
             with col3:
                 st.metric(
                     "Cash",
-                    format_large_number(cash_val, prefix="$")
+                    f"${cash_val:,.0f}" if cash_val is not None else "Not Available"
                 )
                 st.metric(
                     "Total Debt",
-                    format_large_number(debt_val, prefix="$")
+                    f"${debt_val:,.0f}" if debt_val is not None else "Not Available"
                 )
                 st.metric(
                     "Shares Outstanding",
-                    format_large_number(shares_val, prefix="", suffix="")
+                    f"{shares_val:,.0f}" if shares_val is not None else "Not Available"
                 )
 
             st.markdown("### Enterprise & Return Metrics")
@@ -372,7 +335,7 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
             with col_e1:
                 st.metric(
                     "Enterprise Value",
-                    format_large_number(business_val, prefix="$")
+                    f"${business_val:,.0f}" if business_val is not None else "Not Available"
                 )
 
             with col_e2:
