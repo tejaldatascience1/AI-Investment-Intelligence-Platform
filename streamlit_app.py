@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 3.3 (Fixed & Cleaned)
+# Version: 3.4 (Production Enhanced Edition)
 # ==========================================
 
 import streamlit as st
@@ -38,7 +38,7 @@ st.set_page_config(
 )
 
 # ----------------------------------
-# Custom UI Styling
+# Custom UI Styling (Fixed Dark Mode Readability & Layout)
 # ----------------------------------
 
 st.markdown("""
@@ -46,11 +46,35 @@ st.markdown("""
     .main {
         background-color: #0e1117;
     }
+    /* Metric Card Styling with Bloomberg Terminal Aesthetics */
     .stMetric {
         background-color: #161b22;
         border: 1px solid #30363d;
-        padding: 15px;
+        padding: 18px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    /* Force all metric labels and values to be bright, high-contrast, and fully readable */
+    [data-testid="stMetricLabel"] {
+        color: #8b949e !important;
+        font-weight: 600;
+        font-size: 0.9rem !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-weight: 700;
+        font-size: 1.4rem !important;
+    }
+    [data-testid="stMetricDelta"] {
+        color: #58a6ff !important;
+    }
+    /* General text adjustments for seamless dark theme readability */
+    p, span, div, label {
+        color: #c9d1d9;
+    }
+    .stDataFrame {
         border-radius: 8px;
+        border: 1px solid #30363d;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -78,7 +102,7 @@ st.subheader("Bloomberg Mini Terminal for Retail Investors & Analysts")
 st.markdown(
     """
     An AI-driven investment research platform that helps users analyze companies
-    using financial statements, valuation models, risk intelligence and document analysis.
+    using live financial statements, rigorous valuation models, risk intelligence, and balance sheet diagnostics.
     """
 )
 
@@ -177,11 +201,15 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                 f_score = financial_health.get("Financial Health Score", 0) if financial_health else 0
                 v_score = valuation_result.get("Valuation Score", 0) if valuation_result else 0
                 
-                # Removed extra keyword arguments to match the standard function signature perfectly
+                # Pass optional metrics via kwargs to match recommendation engine v3.0 specs
                 recommendation = generate_recommendation(
                     f_score,
                     v_score,
-                    margin_of_safety
+                    margin_of_safety,
+                    debt_score=financial_health.get("Debt Score", 10.0),
+                    cash_flow_score=financial_health.get("Cash Flow Score", 10.0),
+                    profitability_score=financial_health.get("Profitability Score", 15.0),
+                    liquidity_score=financial_health.get("Liquidity Score", 10.0)
                 )
 
                 st.success("Analysis Completed Successfully ✅")
@@ -205,22 +233,22 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
         with col1:
             st.metric(
                 "Financial Health",
-                f"{fh_score_val}/100" if fh_score_val != 'N/A' else "N/A"
+                f"{fh_score_val}/100" if fh_score_val != 'N/A' else "Not Available"
             )
 
         with col2:
             st.metric(
                 "Profitability",
-                prof_score_val_str if prof_score_val_str != 'N/A' else "N/A"
+                f"{prof_score_val_str}/35" if prof_score_val_str != 'N/A' else "Not Available"
             )
 
         with col3:
             st.metric(
                 "Liquidity",
-                liq_score_val_str if liq_score_val_str != 'N/A' else "N/A"
+                f"{liq_score_val_str}/15" if liq_score_val_str != 'N/A' else "Not Available"
             )
 
-        st.write("### Financial Score Breakdown")
+        st.markdown("### Financial Score Breakdown")
 
         if financial_health:
             fh_df = pd.DataFrame(list(financial_health.items()), columns=["Metric", "Score"])
@@ -257,7 +285,9 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
         fig.update_layout(
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            font_color="white"
+            font_color="white",
+            title_font=dict(size=18, color="#ffffff"),
+            margin=dict(l=20, r=20, t=50, b=20)
         )
 
         st.plotly_chart(
@@ -268,36 +298,73 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
         st.divider()
 
         # ----------------------------------
-        # Valuation Analysis Section
+        # Valuation & Balance Sheet Metrics Section
         # ----------------------------------
-        st.subheader("💰 Valuation Analysis")
+        st.subheader("💰 Valuation & Balance Sheet Metrics")
 
-        col1, col2 = st.columns(2)
+        # Safely extract requested additional metrics
+        fcf_val = valuation.get('Free Cash Flow') if valuation else None
+        cash_val = valuation.get('Total Cash') if valuation else None
+        debt_val = valuation.get('Total Debt') if valuation else None
+        shares_val = valuation.get('Shares Outstanding') if valuation else None
+        
+        business_val = intrinsic.get('Business Value') if intrinsic else None
+        
+        # Approximate dynamic WACC based on capital structure or default standard
+        current_price_val = valuation.get('Current Price') if valuation else None
+        estimated_wacc = 0.095  # Standard benchmark default proxy matching valuation engine
+        if shares_val and current_price_val and debt_val is not None and cash_val is not None:
+            equity_cap = shares_val * current_price_val
+            total_cap = equity_cap + debt_val
+            if total_cap > 0:
+                # Dynamic proxy calculation
+                equity_weight = equity_cap / total_cap
+                debt_weight = debt_val / total_cap
+                estimated_wacc = (equity_weight * 0.10) + (debt_weight * 0.05 * 0.79)
+                estimated_wacc = max(0.06, min(estimated_wacc, 0.15))
+
+        col1, col2, col3 = st.columns(3)
 
         with col1:
-            current_price = valuation.get('Current Price') if valuation else None
             st.metric(
                 "Current Price",
-                f"${current_price:,.2f}" if current_price is not None else "Not Available"
+                f"${current_price_val:,.2f}" if current_price_val is not None else "Not Available"
             )
-
-            pe_ratio = valuation.get("P/E Ratio") if valuation else None
             st.metric(
-                "P/E Ratio",
-                f"{pe_ratio:,.2f}" if pe_ratio is not None else "Not Available"
+                "Free Cash Flow (FCF)",
+                f"${fcf_val:,.0f}" if fcf_val is not None else "Not Available"
+            )
+            st.metric(
+                "Enterprise Value",
+                f"${business_val:,.0f}" if business_val is not None and business_val > 0 else "Not Available"
             )
 
         with col2:
-            book_value = valuation.get('Book Value Per Share') if valuation else None
             st.metric(
-                "Book Value Per Share",
-                f"${book_value:,.2f}" if book_value is not None else "Not Available"
+                "P/E Ratio",
+                f"{valuation.get('P/E Ratio'):,.2f}" if valuation and valuation.get("P/E Ratio") is not None else "Not Available"
+            )
+            st.metric(
+                "Total Cash",
+                f"${cash_val:,.0f}" if cash_val is not None else "Not Available"
+            )
+            st.metric(
+                "Estimated WACC",
+                f"{estimated_wacc * 100:.2f}%" if estimated_wacc is not None else "Not Available"
             )
 
-            pb_ratio = valuation.get("P/B Ratio") if valuation else None
+        with col3:
             st.metric(
                 "P/B Ratio",
-                f"{pb_ratio:,.2f}" if pb_ratio is not None else "Not Available"
+                f"{valuation.get('P/B Ratio'):,.2f}" if valuation and valuation.get("P/B Ratio") is not None else "Not Available"
+            )
+            st.metric(
+                "Total Debt",
+                f"${debt_val:,.0f}" if debt_val is not None else "Not Available"
+            )
+            st.metric(
+                "Shares Outstanding",
+                f"{shares_val:,.0f}" if shares_val is not None else "Not Available"
             )
 
         overall_val_status = valuation_result.get("Overall Valuation", "Not Available") if valuation_result else "Not Available"
