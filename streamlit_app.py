@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 3.7 (Modern UI & Theme Enhancement Edition)
+# Version: 3.8 (Production Display & Native UI Polish Edition)
 # ==========================================
 
 import streamlit as st
@@ -35,70 +35,6 @@ st.set_page_config(
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
-)
-
-# ----------------------------------
-# Custom Modern UI Styling (Adaptive Light/Dark Mode)
-# ----------------------------------
-
-st.markdown(
-    """
-    <style>
-    /* Global Card & Container Styling adapting natively to Streamlit themes */
-    .stApp {
-        background-color: var(--background-color);
-        color: var(--text-color);
-    }
-    
-    /* Modern card containers with subtle borders and shadows */
-    div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
-        border-radius: 12px;
-    }
-
-    /* Metric card modern enhancement */
-    div[data-testid="stMetric"] {
-        background-color: var(--secondary-background-color);
-        border: 1px solid rgba(128, 128, 128, 0.2);
-        padding: 15px 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
-    }
-
-    /* Fix metric label and value contrast */
-    [data-testid="stMetricLabel"] {
-        font-size: 0.9rem !important;
-        font-weight: 600 !important;
-        opacity: 0.85;
-    }
-
-    [data-testid="stMetricValue"] {
-        font-size: 1.6rem !important;
-        font-weight: 700 !important;
-    }
-
-    /* Smooth buttons */
-    .stButton > button {
-        border-radius: 8px;
-        font-weight: 600;
-        letter-spacing: 0.3px;
-        transition: all 0.2s ease-in-out;
-    }
-
-    /* Dataframe container padding & polish */
-    div[data-testid="stDataFrame"] {
-        border-radius: 8px;
-        overflow: hidden;
-        border: 1px solid rgba(128, 128, 128, 0.2);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
 )
 
 # ----------------------------------
@@ -212,10 +148,10 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                         margin_of_safety = 0.0
                 else:
                     intrinsic = {
-                        "Business Value": 0,
-                        "Shares Outstanding": 0,
-                        "Intrinsic Value": 0,
-                        "Margin of Safety": 0.0
+                        "Business Value": None,
+                        "Shares Outstanding": None,
+                        "Intrinsic Value": None,
+                        "Margin of Safety": None
                     }
                     margin_of_safety = 0.0
 
@@ -245,28 +181,28 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
         # ----------------------------------
         st.subheader("📊 Financial Health Overview")
 
-        fh_score_val = financial_health.get('Financial Health Score', 'N/A')
-        prof_score_val_str = financial_health.get('Profitability Score', 'N/A')
-        liq_score_val_str = financial_health.get('Liquidity Score', 'N/A')
+        fh_score_val = financial_health.get('Financial Health Score', 'N/A') if financial_health else 'N/A'
+        prof_score_val_str = financial_health.get('Profitability Score', 'N/A') if financial_health else 'N/A'
+        liq_score_val_str = financial_health.get('Liquidity Score', 'N/A') if financial_health else 'N/A'
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
             st.metric(
                 "Financial Health",
-                f"{fh_score_val}/100" if fh_score_val != 'N/A' else "Not Available"
+                f"{fh_score_val}/100" if fh_score_val is not None and fh_score_val != 'N/A' else "Not Available"
             )
 
         with col2:
             st.metric(
                 "Profitability",
-                f"{prof_score_val_str}/35" if prof_score_val_str != 'N/A' else "Not Available"
+                f"{prof_score_val_str}/35" if prof_score_val_str is not None and prof_score_val_str != 'N/A' else "Not Available"
             )
 
         with col3:
             st.metric(
                 "Liquidity",
-                f"{liq_score_val_str}/15" if liq_score_val_str != 'N/A' else "Not Available"
+                f"{liq_score_val_str}/15" if liq_score_val_str is not None and liq_score_val_str != 'N/A' else "Not Available"
             )
 
         st.markdown("### Financial Score Breakdown")
@@ -286,11 +222,11 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                 "Cash Flow"
             ],
             "Score": [
-                financial_health.get("Profitability Score", 0),
-                financial_health.get("Growth Score", 0),
-                financial_health.get("Debt Score", 0),
-                financial_health.get("Liquidity Score", 0),
-                financial_health.get("Cash Flow Score", 0)
+                financial_health.get("Profitability Score", 0) if financial_health else 0,
+                financial_health.get("Growth Score", 0) if financial_health else 0,
+                financial_health.get("Debt Score", 0) if financial_health else 0,
+                financial_health.get("Liquidity Score", 0) if financial_health else 0,
+                financial_health.get("Cash Flow Score", 0) if financial_health else 0
             ]
         })
 
@@ -322,6 +258,11 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
         st.subheader("💰 Valuation & Balance Sheet Metrics")
 
         # Safely extract requested additional metrics
+        current_price_val = valuation.get('Current Price') if valuation else None
+        eps_val = valuation.get('EPS') if valuation else None
+        book_value_val = valuation.get('Book Value Per Share') if valuation else None
+        pe_ratio_val = valuation.get('P/E Ratio') if valuation else None
+        pb_ratio_val = valuation.get('P/B Ratio') if valuation else None
         fcf_val = valuation.get('Free Cash Flow') if valuation else None
         cash_val = valuation.get('Total Cash') if valuation else None
         debt_val = valuation.get('Total Debt') if valuation else None
@@ -330,82 +271,101 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
         business_val = intrinsic.get('Business Value') if intrinsic else None
         
         # Approximate dynamic WACC based on capital structure or default standard
-        current_price_val = valuation.get('Current Price') if valuation else None
         estimated_wacc = 0.095  # Standard benchmark default proxy matching valuation engine
         if shares_val and current_price_val and debt_val is not None and cash_val is not None:
             equity_cap = shares_val * current_price_val
             total_cap = equity_cap + debt_val
             if total_cap > 0:
-                # Dynamic proxy calculation
                 equity_weight = equity_cap / total_cap
                 debt_weight = debt_val / total_cap
                 estimated_wacc = (equity_weight * 0.10) + (debt_weight * 0.05 * 0.79)
                 estimated_wacc = max(0.06, min(estimated_wacc, 0.15))
 
-        col1, col2, col3 = st.columns(3)
+        # Only show valuation results if sufficient data exists
+        has_sufficient_valuation_data = (current_price_val is not None or fcf_val is not None or pe_ratio_val is not None)
 
-        with col1:
-            st.metric(
-                "Current Price",
-                f"${current_price_val:,.2f}" if current_price_val is not None else "Not Available"
-            )
-            st.metric(
-                "Free Cash Flow (FCF)",
-                f"${fcf_val:,.0f}" if fcf_val is not None else "Not Available"
-            )
-            st.metric(
-                "Enterprise Value",
-                f"${business_val:,.0f}" if business_val is not None and business_val > 0 else "Not Available"
-            )
+        if has_sufficient_valuation_data:
+            col1, col2, col3 = st.columns(3)
 
-        with col2:
-            st.metric(
-                "P/E Ratio",
-                f"{valuation.get('P/E Ratio'):,.2f}" if valuation and valuation.get("P/E Ratio") is not None else "Not Available"
-            )
-            st.metric(
-                "Total Cash",
-                f"${cash_val:,.0f}" if cash_val is not None else "Not Available"
-            )
-            st.metric(
-                "Estimated WACC",
-                f"{estimated_wacc * 100:.2f}%" if estimated_wacc is not None else "Not Available"
-            )
+            with col1:
+                st.metric(
+                    "Current Price",
+                    f"${current_price_val:,.2f}" if current_price_val is not None else "Not Available"
+                )
+                st.metric(
+                    "EPS",
+                    f"${eps_val:,.2f}" if eps_val is not None else "Not Available"
+                )
+                st.metric(
+                    "Book Value",
+                    f"${book_value_val:,.2f}" if book_value_val is not None else "Not Available"
+                )
 
-        with col3:
-            st.metric(
-                "P/B Ratio",
-                f"{valuation.get('P/B Ratio'):,.2f}" if valuation and valuation.get("P/B Ratio") is not None else "Not Available"
-            )
-            st.metric(
-                "Total Debt",
-                f"${debt_val:,.0f}" if debt_val is not None else "Not Available"
-            )
-            st.metric(
-                "Shares Outstanding",
-                f"${shares_val:,.0f}" if shares_val is not None else "Not Available"
-            )
+            with col2:
+                st.metric(
+                    "P/E",
+                    f"{pe_ratio_val:,.2f}" if pe_ratio_val is not None else "Not Available"
+                )
+                st.metric(
+                    "P/B",
+                    f"{pb_ratio_val:,.2f}" if pb_ratio_val is not None else "Not Available"
+                )
+                st.metric(
+                    "Free Cash Flow",
+                    f"${fcf_val:,.0f}" if fcf_val is not None else "Not Available"
+                )
 
-        overall_val_status = valuation_result.get("Overall Valuation", "Not Available") if valuation_result else "Not Available"
-        st.info(f"**Valuation Standing:** {overall_val_status}")
+            with col3:
+                st.metric(
+                    "Cash",
+                    f"${cash_val:,.0f}" if cash_val is not None else "Not Available"
+                )
+                st.metric(
+                    "Total Debt",
+                    f"${debt_val:,.0f}" if debt_val is not None else "Not Available"
+                )
+                st.metric(
+                    "Shares Outstanding",
+                    f"{shares_val:,.0f}" if shares_val is not None else "Not Available"
+                )
 
-        st.subheader("📈 Intrinsic Value & Margin of Safety")
+            st.markdown("### Enterprise & Return Metrics")
+            col_e1, col_e2, col_e3 = st.columns(3)
 
-        col1, col2 = st.columns(2)
+            with col_e1:
+                st.metric(
+                    "Enterprise Value",
+                    f"${business_val:,.0f}" if business_val is not None and business_val > 0 else "Not Available"
+                )
 
-        with col1:
-            iv_val = intrinsic.get('Intrinsic Value') if intrinsic else None
-            st.metric(
-                "Intrinsic Value",
-                f"${iv_val:,.2f}" if iv_val is not None and iv_val > 0 else "Not Available"
-            )
+            with col_e2:
+                st.metric(
+                    "WACC",
+                    f"{estimated_wacc * 100:.2f}%" if estimated_wacc is not None else "Not Available"
+                )
 
-        with col2:
-            mos_val = intrinsic.get('Margin of Safety') if intrinsic else None
-            st.metric(
-                "Margin of Safety",
-                f"${mos_val:,.2f} %" if mos_val is not None else "Not Available"
-            )
+            overall_val_status = valuation_result.get("Overall Valuation", "Not Available") if valuation_result else "Not Available"
+            st.info(f"**Valuation Standing:** {overall_val_status}")
+
+            st.subheader("📈 Intrinsic Value & Margin of Safety")
+
+            col_iv1, col_iv2 = st.columns(2)
+
+            with col_iv1:
+                iv_val = intrinsic.get('Intrinsic Value') if intrinsic else None
+                st.metric(
+                    "Intrinsic Value",
+                    f"${iv_val:,.2f}" if iv_val is not None and iv_val > 0 else "Not Available"
+                )
+
+            with col_iv2:
+                mos_val = intrinsic.get('Margin of Safety') if intrinsic else None
+                st.metric(
+                    "Margin of Safety",
+                    f"{mos_val:,.2f}%" if mos_val is not None else "Not Available"
+                )
+        else:
+            st.warning("Valuation results are unavailable due to insufficient market or fundamental data.")
 
         st.divider()
 
@@ -417,16 +377,16 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
         rec_title = recommendation.get("Recommendation", "N/A") if recommendation else "N/A"
         rec_reason = recommendation.get("Reason", "No rationale provided.") if recommendation else "No rationale provided."
 
-        col1, col2 = st.columns([1, 2])
+        col_r1, col_r2 = st.columns([1, 2])
 
-        with col1:
+        with col_r1:
             st.metric(
                 "Recommendation",
-                rec_title
+                rec_title if rec_title is not None else "Not Available"
             )
 
-        with col2:
-            st.info(rec_reason)
+        with col_r2:
+            st.info(rec_reason if rec_reason is not None else "Not Available")
 
         st.divider()
 
