@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 3.6 (Native Streamlit Theme Restoration Edition)
+# Version: 3.7 (Modern UI & Theme Enhancement Edition)
 # ==========================================
 
 import streamlit as st
@@ -35,6 +35,70 @@ st.set_page_config(
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
+)
+
+# ----------------------------------
+# Custom Modern UI Styling (Adaptive Light/Dark Mode)
+# ----------------------------------
+
+st.markdown(
+    """
+    <style>
+    /* Global Card & Container Styling adapting natively to Streamlit themes */
+    .stApp {
+        background-color: var(--background-color);
+        color: var(--text-color);
+    }
+    
+    /* Modern card containers with subtle borders and shadows */
+    div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
+        border-radius: 12px;
+    }
+
+    /* Metric card modern enhancement */
+    div[data-testid="stMetric"] {
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Fix metric label and value contrast */
+    [data-testid="stMetricLabel"] {
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        opacity: 0.85;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-size: 1.6rem !important;
+        font-weight: 700 !important;
+    }
+
+    /* Smooth buttons */
+    .stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        transition: all 0.2s ease-in-out;
+    }
+
+    /* Dataframe container padding & polish */
+    div[data-testid="stDataFrame"] {
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid rgba(128, 128, 128, 0.2);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # ----------------------------------
@@ -240,7 +304,9 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
             color_continuous_scale="Viridis"
         )
         fig.update_layout(
-            margin=dict(l=20, r=20, t=50, b=20)
+            margin=dict(l=20, r=20, t=50, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)"
         )
 
         st.plotly_chart(
@@ -317,7 +383,7 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
             )
             st.metric(
                 "Shares Outstanding",
-                f"{shares_val:,.0f}" if shares_val is not None else "Not Available"
+                f"${shares_val:,.0f}" if shares_val is not None else "Not Available"
             )
 
         overall_val_status = valuation_result.get("Overall Valuation", "Not Available") if valuation_result else "Not Available"
