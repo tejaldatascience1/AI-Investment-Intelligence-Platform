@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: valuation_engine.py
-# Version: 3.0 (Production DCF Engine)
+# Version: 4.0 (Production DCF Engine)
 # ==========================================
 
 import logging
@@ -34,6 +34,15 @@ def get_valuation_metrics(ticker):
         eps = info.get("trailingEps")
         shares_outstanding = info.get("sharesOutstanding")
 
+        # Fallback to fast_info if shares_outstanding is missing from info
+        if not shares_outstanding:
+            try:
+                fi = company.fast_info
+                if fi and "shares" in fi:
+                    shares_outstanding = fi["shares"]
+            except Exception:
+                pass
+
         # Fetch Financial Statements for FCF, Cash, and Debt
         cash_flow_stmt = company.cashflow
         balance_sheet = company.balance_sheet
@@ -43,16 +52,27 @@ def get_valuation_metrics(ticker):
         total_debt = None
 
         if cash_flow_stmt is not None and not cash_flow_stmt.empty:
-            # Try to fetch latest Free Cash Flow or calculate Operating CF - CapEx
             for col in cash_flow_stmt.columns:
                 try:
-                    ocf = cash_flow_stmt.loc["Operating Cash Flow", col] if "Operating Cash Flow" in cash_flow_stmt.index else None
-                    capex = cash_flow_stmt.loc["Capital Expenditure", col] if "Capital Expenditure" in cash_flow_stmt.index else None
+                    ocf = None
+                    capex = None
+                    
+                    # Normalize index lookups by cleaning/lowercasing keys or checking variations
+                    for idx in cash_flow_stmt.index:
+                        idx_str = str(idx).strip().lower()
+                        if idx_str in ["operating cash flow", "total cash from operating activities", "operatingcashflow"]:
+                            ocf = cash_flow_stmt.loc[idx, col]
+                        elif idx_str in ["capital expenditure", "capital expenditures", "capex"]:
+                            capex = cash_flow_stmt.loc[idx, col]
+                        elif idx_str in ["free cash flow", "freecashflow"]:
+                            free_cash_flow = float(cash_flow_stmt.loc[idx, col])
+                            break
+
+                    if free_cash_flow is not None:
+                        break
+
                     if ocf is not None and capex is not None:
                         free_cash_flow = float(ocf) + float(capex) # Capex is typically negative
-                        break
-                    elif "Free Cash Flow" in cash_flow_stmt.index:
-                        free_cash_flow = float(cash_flow_stmt.loc["Free Cash Flow", col])
                         break
                 except Exception:
                     continue
@@ -60,18 +80,20 @@ def get_valuation_metrics(ticker):
         if balance_sheet is not None and not balance_sheet.empty:
             for col in balance_sheet.columns:
                 try:
-                    if "Cash And Cash Equivalents" in balance_sheet.index:
-                        total_cash = float(balance_sheet.loc["Cash And Cash Equivalents", col])
-                    elif "Cash Cash Equivalents And Short Term Investments" in balance_sheet.index:
-                        total_cash = float(balance_sheet.loc["Cash Cash Equivalents And Short Term Investments", col])
+                    for idx in balance_sheet.index:
+                        idx_str = str(idx).strip().lower()
+                        if idx_str in ["cash and cash equivalents", "cashcashequivalentsandshortterminvestments", "cash and short term investments"]:
+                            if total_cash is None:
+                                total_cash = float(balance_sheet.loc[idx, col])
+                        elif idx_str in ["total debt", "short long term debt total", "totaldebt"]:
+                            if total_debt is None:
+                                total_debt = float(balance_sheet.loc[idx, col])
+                        elif idx_str in ["long term debt", "longtermdebt"]:
+                            if total_debt is None:
+                                total_debt = float(balance_sheet.loc[idx, col])
 
-                    if "Total Debt" in balance_sheet.index:
-                        total_debt = float(balance_sheet.loc["Total Debt", col])
-                    elif "Long Term Debt" in balance_sheet.index:
-                        short_debt = balance_sheet.loc["Current Debt", col] if "Current Debt" in balance_sheet.index else 0.0
-                        long_debt = balance_sheet.loc["Long Term Debt", col]
-                        total_debt = float(long_debt) + float(short_debt if short_debt else 0.0)
-                    break
+                    if total_cash is not None or total_debt is not None:
+                        break
                 except Exception:
                     continue
 
@@ -208,13 +230,13 @@ def calculate_professional_intrinsic_value(valuation_metrics):
             return None
 
         # Dynamic WACC Approximation via CAPM proxy & Capital Structure
-        cost_of_equity = 0.10 # Baseline market expected return proxy
+        cost_of_equity = 0.10 
         risk_free_rate = 0.041
         beta = 1.1
         market_return = 0.09
         cost_of_equity = risk_free_rate + beta * (market_return - risk_free_rate)
 
-        cost_of_debt = 0.05 # Standard corporate debt cost approximation
+        cost_of_debt = 0.05 
         tax_rate = 0.21
 
         cash_val = total_cash if total_cash is not None else 0.0
@@ -225,11 +247,11 @@ def calculate_professional_intrinsic_value(valuation_metrics):
             equity_weight = (shares * (current_price if current_price else 100)) / total_capital
             debt_weight = debt_val / total_capital
             wacc = (equity_weight * cost_of_equity) + (debt_weight * cost_of_debt * (1 - tax_rate))
-            wacc = max(0.06, min(wacc, 0.15)) # Bound WACC between 6% and 15% for realism
+            wacc = max(0.06, min(wacc, 0.15)) 
         else:
             wacc = 0.095
 
-        # 2-Stage Growth Projections (Stage 1: 5 years high growth, Stage 2: Terminal)
+        # 2-Stage Growth Projections
         growth_rate_stage1 = 0.07
         terminal_growth_rate = 0.025
         projection_years = 5
