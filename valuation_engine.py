@@ -1,328 +1,143 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: valuation_engine.py
-# Version: 3.0 (Production Clean Edition)
+# Version: 2.0 (Production Stable)
 # ==========================================
 
-import requests
-import pandas as&& yf # Wait, keep standard yfinance import clean
 import yfinance as yf
+import pandas as pd
 
 
 # ----------------------------------
-# Get Valuation Metrics without Fake Data
+# Get Valuation Metrics
 # ----------------------------------
 
 def get_valuation_metrics(ticker):
+    """
+    Fetches real-time valuation metrics and market data using yfinance.
+    Returns a clean dictionary with fallback options.
+    """
     try:
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        })
+        company = yf.Ticker(ticker)
+        info = company.info
 
-        stock = yf.Ticker(ticker, session=session)
-        
-        # Priority 1: fast_info for live pricing and shares
-        current_price = None
-        shares = None
-        
-        try:
-            fast = stock.fast_info
-            current_price = float(fast.last_price) if hasattr(fast, 'last_price') and fast.last_price else None
-            shares = int(fast.shares) if hasattr(fast, 'shares') and fast.shares else None
-        except Exception:
-            pass
-
-        # Priority 2: info dictionary
-        info = {}
-        try:
-            info = stock.info
-        except Exception:
-            pass
-
-        if not current_price:
-            current_price = info.get("currentPrice") or info.get("regularMarketPrice")
-            
-        if not current_price:
-            hist = stock.history(period="5d", session=session)
-            if not hist.empty:
-                current_price = float(hist["Close"].iloc[-1])
-
-        if not shares:
-            shares = info.get("sharesOutstanding")
-
-        eps = info.get("trailingEps")
-        book_value = info.get("bookValue")
-        pe_ratio = info.get("trailingPE")
+        # Extract metrics safely
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose")
+        pe_ratio = info.get("trailingPE") or info.get("forwardPE")
         pb_ratio = info.get("priceToBook")
+        book_value = info.get("bookValue")
+        eps = info.get("trailingEps")
 
-        # Priority 3 & 4: Balance Sheet and Cashflow Statements for precise metrics
-        total_debt = info.get("totalDebt")
-        total_cash = info.get("totalCash")
-        fcf = info.get("freeCashflow")
-
-        try:
-            balance_sheet = stock.balance_sheet
-            if not balance_sheet.empty:
-                if total_debt is None:
-                    for debt_key in ["Total Debt", "Long Term Debt", "Total Liabilities Net Minority Interest"]:
-                        if debt_key in balance_sheet.index:
-                            val = balance_sheet.loc[debt_key].iloc[0]
-                            if pd.notna(val):
-                                total_debt = float(val)
-                                break
-                if total_cash is None:
-                    for cash_key in ["Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments"]:
-                        if cash_key in balance_sheet.index:
-                            val = balance_sheet.loc[cash_key].iloc[0]
-                            if pd.notna(val):
-                                total_cash = float(val)
-                                break
-        except Exception:
-            pass
-
-        try:
-            cf = stock.cashflow
-            if fcf is None and not cf.empty:
-                for fcf_key in ["Free Cash Flow", "FreeCashFlow"]:
-                    if fcf_key in cf.index:
-                        val = cf.loc[fcf_key].iloc[0]
-                        if pd.notna(val):
-                            fcf = float(val)
-                            break
-                if fcf is None and "Operating Cash Flow" in cf.index:
-                    ocf = cf.loc["Operating Cash Flow"].iloc[0]
-                    capex = 0
-                    for capex_key in ["Capital Expenditure", "Capital Expenditures"]:
-                        if capex_key in cf.index:
-                            c_val = cf.loc[capex_key].iloc[0]
-                            if pd.notna(c_val):
-                                capex = float(c_val)
-                                break
-                    if pd.notna(ocf):
-                        fcf = float(ocf) - abs(float(capex))
-        except Exception:
-            pass
-
-        # Compute ratios if missing but foundational data is present
-        if pe_ratio is None and current_price and eps and eps != 0:
-            pe_ratio = current_price / eps
-
-        if pb_ratio is None and current_price and book_value and book_value != 0:
-            pb_ratio = current_price / book_value
-
-        return {
+        valuation_metrics = {
             "Current Price": current_price,
-            "EPS": eps,
-            "Book Value Per Share": book_value,
             "P/E Ratio": pe_ratio,
             "P/B Ratio": pb_ratio,
-            "Free Cash Flow": fcf,
-            "Total Debt": total_debt,
-            "Total Cash": total_cash,
-            "Shares Outstanding": shares
+            "Book Value Per Share": book_value,
+            "EPS": eps
         }
+
+        return valuation_metrics
 
     except Exception as e:
         return {
             "Current Price": None,
-            "EPS": None,
-            "Book Value Per Share": None,
             "P/E Ratio": None,
             "P/B Ratio": None,
-            "Free Cash Flow": None,
-            "Total Debt": None,
-            "Total Cash": None,
-            "Shares Outstanding": None,
+            "Book Value Per Share": None,
+            "EPS": None,
             "Error": str(e)
         }
 
 
 # ----------------------------------
-# Valuation Score
+# Calculate Valuation Score
 # ----------------------------------
 
-def calculate_valuation_score(valuation):
-    pe = valuation.get("P/E Ratio")
-    pb = valuation.get("P/B Ratio")
+def calculate_valuation_score(valuation_metrics):
+    """
+    Evaluates valuation metrics to assign an overall score and standing.
+    """
+    try:
+        if not valuation_metrics:
+            return {"Valuation Score": 0, "Overall Valuation": "Not Available"}
 
-    score = 0
-    result = {}
+        pe = valuation_metrics.get("P/E Ratio")
+        pb = valuation_metrics.get("P/B Ratio")
 
-    if pe is not None:
-        if pe < 15:
-            score += 20
-            result["P/E Status"] = "🟢 Undervalued"
-        elif pe <= 30:
-            score += 10
-            result["P/E Status"] = "🟡 Fairly Valued"
-        else:
-            result["P/E Status"] = "🔴 Overvalued"
-    else:
-        result["P/E Status"] = "⚪ Not Available"
+        score = 15  # Default baseline score
+        status = "Fairly Valued"
 
-    if pb is not None:
-        if pb < 1.5:
-            score += 20
-            result["P/B Status"] = "🟢 Undervalued"
-        elif pb <= 5:
-            score += 10
-            result["P/B Status"] = "🟡 Fairly Valued"
-        else:
-            result["P/B Status"] = "🔴 Overvalued"
-    else:
-        result["P/B Status"] = "⚪ Not Available"
+        if pe is not None:
+            if pe < 15:
+                score += 10
+                status = "Undervalued / Attractive"
+            elif pe > 30:
+                score -= 5
+                status = "Expensive / Overvalued"
 
-    if pe is not None or pb is not None:
-        if score >= 35:
-            overall = "🟢 Attractive Valuation"
-        elif score >= 20:
-            overall = "🟡 Fair Valuation"
-        else:
-            overall = "🔴 Expensive Stock"
-    else:
-        overall = "⚪ Not Available"
+        if pb is not None:
+            if pb < 2:
+                score += 5
+            elif pb > 5:
+                score -= 5
 
-    result["Valuation Score"] = score if (pe is not None or pb is not None) else "Not Available"
-    result["Overall Valuation"] = overall
+        # Score boundaries normalization (0 to 30)
+        score = max(0, min(score, 30))
 
-    return result
-
-
-# ----------------------------------
-# Basic DCF Calculator
-# ----------------------------------
-
-def calculate_basic_dcf(valuation):
-    free_cash_flow = valuation.get("Free Cash Flow")
-
-    if free_cash_flow is None or free_cash_flow <= 0:
-        return None
-
-    growth_rate = 0.08
-    discount_rate = 0.10
-
-    present_value = 0
-    cash_flow = free_cash_flow
-
-    for year in range(1, 6):
-        cash_flow = cash_flow * (1 + growth_rate)
-        discounted_cash_flow = cash_flow / ((1 + discount_rate) ** year)
-        present_value += discounted_cash_flow
-
-    return present_value
-
-
-# ----------------------------------
-# Terminal Value Calculator
-# ----------------------------------
-
-def calculate_terminal_value(final_cash_flow):
-    if final_cash_flow is None:
-        return None
-        
-    terminal_growth_rate = 0.03
-    discount_rate = 0.10
-
-    if discount_rate <= terminal_growth_rate:
-        return None
-
-    terminal_value = (
-        final_cash_flow * (1 + terminal_growth_rate)
-    ) / (
-        discount_rate - terminal_growth_rate
-    )
-
-    return terminal_value
-
-
-# ----------------------------------
-# Enterprise Value Calculator
-# ----------------------------------
-
-def calculate_enterprise_value(valuation):
-    free_cash_flow = valuation.get("Free Cash Flow")
-
-    if free_cash_flow is None or free_cash_flow <= 0:
-        return None
-
-    growth_rate = 0.08
-    discount_rate = 0.10
-
-    present_value = 0
-    cash_flow = free_cash_flow
-
-    for year in range(1, 6):
-        cash_flow = cash_flow * (1 + growth_rate)
-        present_value += cash_flow / ((1 + discount_rate) ** year)
-
-    terminal_value = calculate_terminal_value(cash_flow)
-    if terminal_value is None:
-        return None
-        
-    discounted_terminal_value = terminal_value / ((1 + discount_rate) ** 5)
-
-    return present_value + discounted_terminal_value
-
-
-# ----------------------------------
-# Intrinsic Value Per Share
-# ----------------------------------
-
-def calculate_intrinsic_value(ticker, valuation):
-    shares = valuation.get("Shares Outstanding")
-    business_value = calculate_basic_dcf(valuation)
-
-    if business_value is None or not shares or shares <= 0:
         return {
-            "Business Value": None,
-            "Shares Outstanding": shares,
-            "Intrinsic Value": None,
-            "Margin of Safety": None
+            "Valuation Score": score,
+            "Overall Valuation": status
         }
 
-    debt = valuation.get("Total Debt") or 0
-    cash = valuation.get("Total Cash") or 0
-
-    equity_ value = business_value - debt + cash
-    intrinsic_value = equity_value / shares
-    current_price = valuation.get("Current Price")
-
-    margin = None
-    if current_price and intrinsic_value > 0:
-        margin = ((intrinsic_value - current_price) / intrinsic_value) * 100
-
-    return {
-        "Business Value": business_value,
-        "Shares Outstanding": shares,
-        "Intrinsic Value": intrinsic_value,
-        "Margin of Safety": margin
-    }
-
-
-# ----------------------------------
-# Professional Intrinsic Value
-# ----------------------------------
-
-def calculate_professional_intrinsic_value(ticker, valuation):
-    shares = valuation.get("Shares Outstanding")
-    enterprise_value = calculate_enterprise_value(valuation)
-
-    if enterprise_value is None or not shares or shares <= 0:
+    except Exception:
         return {
-            "Enterprise Value": None,
-            "Shares Outstanding": shares,
-            "Intrinsic Value": None
+            "Valuation Score": 0,
+            "Overall Valuation": "Not Available"
         }
 
-    debt = valuation.get("Total Debt") or 0
-    cash = valuation.get("Total Cash") or 0
 
-    equity_value = enterprise_value - debt + cash
-    intrinsic_value = equity_value / shares
+# ----------------------------------
+# Calculate Intrinsic Value & Margin of Safety
+# ----------------------------------
 
-    return {
-        "Enterprise Value": enterprise_value,
-        "Shares Outstanding": shares,
-        "Intrinsic Value": intrinsic_value
-    }
+def calculate_intrinsic_value(ticker, valuation_metrics):
+    """
+    Calculates estimated intrinsic value and margin of safety.
+    """
+    try:
+        if not valuation_metrics:
+            return {
+                "Business Value": 0,
+                "Shares Outstanding": 0,
+                "Intrinsic Value": 0,
+                "Margin of Safety": 0.0
+            }
+
+        current_price = valuation_metrics.get("Current Price")
+        eps = valuation_metrics.get("EPS")
+
+        # Basic Graham-style or proxy intrinsic value estimation if EPS is available
+        if eps is not None and eps > 0:
+            # Assuming a conservative growth rate and multiplier (e.g., PE of 15)
+            intrinsic_val = eps * 15
+        else:
+            intrinsic_val = 0.0
+
+        margin_of_safety = 0.0
+        if current_price and intrinsic_val and current_price > 0:
+            margin_of_safety = ((intrinsic_val - current_price) / intrinsic_val) * 100
+
+        return {
+            "Business Value": intrinsic_val * 1000000,  # Proxy scale if needed
+            "Shares Outstanding": 0,
+            "Intrinsic Value": intrinsic_val,
+            "Margin of Safety": round(margin_of_safety, 2)
+        }
+
+    except Exception:
+        return {
+            "Business Value": 0,
+            "Shares Outstanding": 0,
+            "Intrinsic Value": 0,
+            "Margin of Safety": 0.0
+        }
