@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: financial_data.py
-# Version: 4.1 (Optimized & Pickle-Serializable Edition)
+# Version: 4.2 (Fully Compliant & Pickle-Serializable Edition)
 # ==========================================
 
 import logging
@@ -41,8 +41,8 @@ def get_company_financials(ticker):
         try:
             fi = company.fast_info
             if fi is not None:
-                # fast_info acts like a dict or has keys we can iterate over safely
-                fast_info_dict = {k: fi[k] for k in fi}
+                # Safely extract attributes from fast_info
+                fast_info_dict = dict(fi) if hasattr(fi, "keys") else {k: fi[k] for k in dir(fi) if not k.startswith("_")}
         except Exception as e:
             logger.warning(f"Could not fetch fast_info for {ticker}: {e}")
 
@@ -53,9 +53,6 @@ def get_company_financials(ticker):
         except Exception as e:
             logger.warning(f"Could not fetch info dictionary for {ticker}: {e}")
 
-        # Convert DataFrames/Series to dictionaries or primitive formats if necessary, 
-        # or keep DataFrames since they are pickle-serializable, but dict representations 
-        # or clean copies prevent shared-reference and serialization mutation issues.
         income_statement = None
         try:
             inc = company.financials
@@ -63,6 +60,14 @@ def get_company_financials(ticker):
                 income_statement = inc.copy()
         except Exception as e:
             logger.warning(f"Could not fetch financials for {ticker}: {e}")
+
+        quarterly_financial_statement = None
+        try:
+            q_inc = company.quarterly_financials
+            if q_inc is not None and not q_inc.empty:
+                quarterly_financial_statement = q_inc.copy()
+        except Exception as e:
+            logger.warning(f"Could not fetch quarterly_financials for {ticker}: {e}")
 
         balance_sheet = None
         try:
@@ -72,7 +77,14 @@ def get_company_financials(ticker):
         except Exception as e:
             logger.warning(f"Could not fetch balance_sheet for {ticker}: {e}")
 
-        logger.info(f"Successfully fetched financial statements for {ticker}")
+        quarterly_balance_sheet = None
+        try:
+            q_bs = company.quarterly_balance_sheet
+            if q_bs is not None and not q_bs.empty:
+                quarterly_balance_sheet = q_bs.copy()
+        except Exception as e:
+            logger.warning(f"Could not fetch quarterly_balance_sheet for {ticker}: {e}")
+
         cash_flow = None
         try:
             cf = company.cashflow
@@ -81,13 +93,26 @@ def get_company_financials(ticker):
         except Exception as e:
             logger.warning(f"Could not fetch cashflow for {ticker}: {e}")
 
-        # Construct clean, fully pickle-serializable dictionary output
+        quarterly_cash_flow = None
+        try:
+            q_cf = company.quarterly_cashflow
+            if q_cf is not None and not q_cf.empty:
+                quarterly_cash_flow = q_cf.copy()
+        except Exception as e:
+            logger.warning(f"Could not fetch quarterly_cashflow for {ticker}: {e}")
+
+        logger.info(f"Successfully fetched financial statements for {ticker}")
+
+        # Construct clean, fully pickle-serializable dictionary output preserving exact keys and standard attributes
         financial_data = {
             "fast_info": fast_info_dict,
             "info": info,
             "income_statement": income_statement,
+            "quarterly_financials": quarterly_financial_statement,
             "balance_sheet": balance_sheet,
-            "cash_flow": cash_flow
+            "quarterly_balance_sheet": quarterly_balance_sheet,
+            "cash_flow": cash_flow,
+            "quarterly_cashflow": quarterly_cash_flow
         }
 
         return financial_data
@@ -98,7 +123,10 @@ def get_company_financials(ticker):
             "fast_info": None,
             "info": None,
             "income_statement": None,
+            "quarterly_financials": None,
             "balance_sheet": None,
+            "quarterly_balance_sheet": None,
             "cash_flow": None,
+            "quarterly_cashflow": None,
             "Error": str(e)
         }
