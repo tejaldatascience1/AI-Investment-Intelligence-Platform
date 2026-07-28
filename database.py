@@ -60,7 +60,9 @@ def get_companies():
 
     connection.close()
 
-    return data
+    data = data[data["ticker"] != "TATAMOTORS.NS"]
+
+return data
 
 
 
