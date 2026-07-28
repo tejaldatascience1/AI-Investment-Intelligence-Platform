@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 3.4 (Production Enhanced Edition)
+# Version: 3.6 (Native Streamlit Theme Restoration Edition)
 # ==========================================
 
 import streamlit as st
@@ -38,53 +38,10 @@ st.set_page_config(
 )
 
 # ----------------------------------
-# Custom UI Styling (Fixed Dark Mode Readability & Layout)
-# ----------------------------------
-
-st.markdown("""
-    <style>
-    .main {
-        background-color: #0e1117;
-    }
-    /* Metric Card Styling with Bloomberg Terminal Aesthetics */
-    .stMetric {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        padding: 18px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    /* Force all metric labels and values to be bright, high-contrast, and fully readable */
-    [data-testid="stMetricLabel"] {
-        color: #8b949e !important;
-        font-weight: 600;
-        font-size: 0.9rem !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: #ffffff !important;
-        font-weight: 700;
-        font-size: 1.4rem !important;
-    }
-    [data-testid="stMetricDelta"] {
-        color: #58a6ff !important;
-    }
-    /* General text adjustments for seamless dark theme readability */
-    p, span, div, label {
-        color: #c9d1d9;
-    }
-    .stDataFrame {
-        border-radius: 8px;
-        border: 1px solid #30363d;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-
-# ----------------------------------
 # Cached Data Loaders for Speed Optimization
 # ----------------------------------
 
-@st.cache_data(ttl=3600)
+@st.cache_resource(ttl=3600)
 def cached_get_company_financials(ticker):
     return get_company_financials(ticker)
 
@@ -283,10 +240,6 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
             color_continuous_scale="Viridis"
         )
         fig.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font_color="white",
-            title_font=dict(size=18, color="#ffffff"),
             margin=dict(l=20, r=20, t=50, b=20)
         )
 
@@ -385,7 +338,7 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
             mos_val = intrinsic.get('Margin of Safety') if intrinsic else None
             st.metric(
                 "Margin of Safety",
-                f"{mos_val:,.2f} %" if mos_val is not None else "Not Available"
+                f"${mos_val:,.2f} %" if mos_val is not None else "Not Available"
             )
 
         st.divider()
