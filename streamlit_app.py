@@ -1,11 +1,15 @@
+# ==========================================
+# AI Investment Intelligence Platform
+# File: streamlit_app.py
+# Version: 3.1 (Production UI Refined)
+# ==========================================
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 
 from database import get_companies
-
 from financial_data import get_company_financials
-
 from financial_analysis import (
     calculate_profitability,
     calculate_growth_and_debt,
@@ -13,13 +17,11 @@ from financial_analysis import (
     calculate_cash_flow,
     calculate_financial_health_score
 )
-
 from valuation_engine import (
     get_valuation_metrics,
     calculate_valuation_score,
     calculate_intrinsic_value
 )
-
 from recommendation_engine import (
     generate_recommendation
 )
@@ -31,299 +33,317 @@ from recommendation_engine import (
 st.set_page_config(
     page_title="AI Investment Intelligence Platform",
     page_icon="📈",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ----------------------------------
+# Custom UI Styling (Bloomberg Mini Terminal Look)
+# ----------------------------------
+
+st.markdown("""
+    <style>
+    .main {
+        background-color: #0e1117;
+    }
+    .stMetric {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        padding: 15px;
+        border-radius: 8px;
+    }
+    .stDataFrame {
+        border-radius: 8px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 
 # ----------------------------------
-# Header
+# Header Section
 # ----------------------------------
 
 st.title("📈 AI-Powered Investment Intelligence Platform")
-
-st.subheader(
-    "Bloomberg Mini Terminal for Retail Investors & Analysts"
-)
-
-st.write(
-"""
-An AI-driven investment research platform that helps users analyze companies
-using financial statements, valuation models, risk intelligence and document analysis.
-"""
+st.subheader("Bloomberg Mini Terminal for Retail Investors & Analysts")
+st.markdown(
+    """
+    An AI-driven investment research platform that helps users analyze companies
+    using financial statements, valuation models, risk intelligence and document analysis.
+    """
 )
 
 st.divider()
 
 
 # ----------------------------------
-# Company Research
+# Company Research Sidebar / Section
 # ----------------------------------
 
 st.header("🏢 Company Research")
 
-company_data = get_companies()
+try:
+    company_data = get_companies()
+except Exception as e:
+    company_data = pd.DataFrame(columns=["country", "sector", "company_name", "ticker"])
+    st.error(f"Error loading company directory: {e}")
 
+if not company_data.empty:
+    col_c1, col_c2, col_c3 = st.columns(3)
 
-countries = sorted(
-    company_data["country"].unique()
-)
+    with col_c1:
+        countries = sorted(company_data["country"].unique()) if "country" in company_data.columns else []
+        selected_country = st.selectbox("🌎 Select Country", countries) if countries else None
 
-selected_country = st.selectbox(
-    "🌎 Select Country",
-    countries
-)
+    filtered_country = company_data[company_data["country"] == selected_country] if selected_country else company_data
 
-filtered_country = company_data[
-    company_data["country"] == selected_country
-]
+    with col_c2:
+        sectors = sorted(filtered_country["sector"].unique()) if "sector" in filtered_country.columns else []
+        selected_sector = st.selectbox("📊 Select Sector", sectors) if sectors else None
 
+    filtered_sector = filtered_country[filtered_country["sector"] == selected_sector] if selected_sector else filtered_country
 
-sectors = sorted(
-    filtered_country["sector"].unique()
-)
+    with col_c3:
+        companies_list = filtered_sector["company_name"].tolist() if "company_name" in filtered_sector.columns else []
+        selected_company = st.selectbox("🏢 Select Company", companies_list) if companies_list else None
 
-selected_sector = st.selectbox(
-    "📊 Select Sector",
-    sectors
-)
+    if selected_company and not filtered_sector.empty:
+        matching_rows = filtered_sector[filtered_sector["company_name"] == selected_company]["ticker"]
+        selected_ticker = matching_rows.values[0] if not matching_rows.empty else None
+    else:
+        selected_ticker = None
 
-filtered_sector = filtered_country[
-    filtered_country["sector"] == selected_sector
-]
+    if selected_company and selected_ticker:
+        st.success(f"Selected Company : **{selected_company}** | Ticker : **{selected_ticker}**")
+else:
+    selected_ticker = None
+    st.warning("No company records found.")
 
-
-selected_company = st.selectbox(
-    "🏢 Select Company",
-    filtered_sector["company_name"]
-)
-
-selected_ticker = filtered_sector[
-    filtered_sector["company_name"] == selected_company
-]["ticker"].values[0]
-
-
-st.success(
-    f"Selected Company : {selected_company} | Ticker : {selected_ticker}"
-)
+st.divider()
 
 
 # ----------------------------------
-# Analysis Engine
+# Analysis Engine Execution
 # ----------------------------------
 
-if st.button("🚀 Generate Investment Intelligence"):
+if st.button("🚀 Generate Investment Intelligence", type="primary", use_container_width=True):
+    if not selected_ticker:
+        st.error("Please select a valid company/ticker before generating intelligence.")
+    else:
+        with st.spinner("Fetching financial statements and executing valuation engine..."):
+            try:
+                financial_data = get_company_financials(selected_ticker)
 
-    with st.spinner("Analyzing Company..."):
+                profitability = calculate_profitability(financial_data)
+                growth = calculate_growth_and_debt(financial_data)
+                liquidity = calculate_liquidity(financial_data)
+                cashflow = calculate_cash_flow(financial_data)
 
-        financial_data = get_company_financials(
-            selected_ticker
+                financial_health = calculate_financial_health_score(
+                    profitability,
+                    growth,
+                    liquidity,
+                    cashflow
+                )
+
+                valuation = get_valuation_metrics(selected_ticker)
+                valuation_result = calculate_valuation_score(valuation)
+                intrinsic = calculate_intrinsic_value(selected_ticker, valuation)
+
+                # Safety Check for Intrinsic Value & Margin of Safety
+                if intrinsic is not None:
+                    margin_of_safety = intrinsic.get("Margin of Safety")
+                    if margin_of_safety is None:
+                        margin_of_safety = 0.0
+                else:
+                    intrinsic = {
+                        "Business Value": 0,
+                        "Shares Outstanding": 0,
+                        "Intrinsic Value": 0,
+                        "Margin of Safety": 0.0
+                    }
+                    margin_of_safety = 0.0
+
+                f_score = financial_health.get("Financial Health Score", 0) if financial_health else 0
+                v_score = valuation_result.get("Valuation Score", 0) if valuation_result else 0
+                
+                # Extract extended scores if available for recommendation engine integration
+                debt_score_val = financial_health.get("Debt Score", 10) if financial_health else 10
+                cf_score_val = financial_health.get("Cash Flow Score", 10) if financial_health else 10
+                prof_score_val = financial_health.get("Profitability Score", 15) if financial_health else 15
+
+                recommendation = generate_recommendation(
+                    f_score,
+                    v_score,
+                    margin_of_safety,
+                    debt_score=debt_score_val,
+                    cash_flow_score=cf_score_val,
+                    profitability_score=prof_score_val
+                )
+
+                st.success("Analysis Completed Successfully ✅")
+            except Exception as ex:
+                st.error(f"An error occurred during analysis: {ex}")
+                st.stop()
+
+        st.divider()
+
+        # ----------------------------------
+        # Financial Health Section
+        # ----------------------------------
+        st.subheader("📊 Financial Health Overview")
+
+        fh_score_val = financial_health.get('Financial Health Score', 'N/A')
+        prof_score_val_str = financial_health.get('Profitability Score', 'N/A')
+        liq_score_val_str = financial_health.get('Liquidity Score', 'N/A')
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                "Financial Health",
+                f"{fh_score_val}/100" if fh_score_val != 'N/A' else "N/A"
+            )
+
+        with col2:
+            st.metric(
+                "Profitability",
+                prof_score_val_str if prof_score_val_str != 'N/A' else "N/A"
+            )
+
+        with col3:
+            st.metric(
+                "Liquidity",
+                liq_score_val_str if liq_score_val_str != 'N/A' else "N/A"
+            )
+
+        st.write("### Financial Score Breakdown")
+
+        if financial_health:
+            fh_df = pd.DataFrame(list(financial_health.items()), columns=["Metric", "Score"])
+            st.dataframe(fh_df, use_container_width=True, hide_index=True)
+
+        st.subheader("📊 Financial Score Visualization")
+
+        chart_data = pd.DataFrame({
+            "Category": [
+                "Profitability",
+                "Growth",
+                "Debt",
+                "Liquidity",
+                "Cash Flow"
+            ],
+            "Score": [
+                financial_health.get("Profitability Score", 0),
+                financial_health.get("Growth Score", 0),
+                financial_health.get("Debt Score", 0),
+                financial_health.get("Liquidity Score", 0),
+                financial_health.get("Cash Flow Score", 0)
+            ]
+        })
+
+        fig = px.bar(
+            chart_data,
+            x="Category",
+            y="Score",
+            text="Score",
+            title="Financial Score Breakdown Matrix",
+            color="Score",
+            color_continuous_scale="Viridis"
+        )
+        fig.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font_color="white"
         )
 
-        profitability = calculate_profitability(
-            financial_data
+        st.plotly_chart(
+            fig,
+            use_container_width=True
         )
 
-        growth = calculate_growth_and_debt(
-            financial_data
-        )
+        st.divider()
 
-        liquidity = calculate_liquidity(
-            financial_data
-        )
+        # ----------------------------------
+        # Valuation Analysis Section
+        # ----------------------------------
+        st.subheader("💰 Valuation Analysis")
 
-        cashflow = calculate_cash_flow(
-            financial_data
-        )
+        col1, col2 = st.columns(2)
 
-        financial_health = calculate_financial_health_score(
-            profitability,
-            growth,
-            liquidity,
-            cashflow
-        )
+        with col1:
+            current_price = valuation.get('Current Price') if valuation else None
+            st.metric(
+                "Current Price",
+                f"${current_price:,.2f}" if current_price is not None else "Not Available"
+            )
 
-        valuation = get_valuation_metrics(
-            selected_ticker
-        )
+            pe_ratio = valuation.get("P/E Ratio") if valuation else None
+            st.metric(
+                "P/E Ratio",
+                f"{pe_ratio:,.2f}" if pe_ratio is not None else "Not Available"
+            )
 
-        valuation_result = calculate_valuation_score(
-            valuation
-        )
+        with col2:
+            book_value = valuation.get('Book Value Per Share') if valuation else None
+            st.metric(
+                "Book Value Per Share",
+                f"${book_value:,.2f}" if book_value is not None else "Not Available"
+            )
 
-        intrinsic = calculate_intrinsic_value(
-            selected_ticker,
-            valuation
-        )
+            pb_ratio = valuation.get("P/B Ratio") if valuation else None
+            st.metric(
+                "P/B Ratio",
+                f"{pb_ratio:,.2f}" if pb_ratio is not None else "Not Available"
+            )
 
-        # Safety Check for Intrinsic Value & Margin of Safety
-        if intrinsic is not None:
-            margin_of_safety = intrinsic.get("Margin of Safety")
-            if margin_of_safety is None:
-                margin_of_safety = 0
-        else:
-            intrinsic = {
-                "Intrinsic Value": 0,
-                "Margin of Safety": 0
-            }
-            margin_of_safety = 0
+        overall_val_status = valuation_result.get("Overall Valuation", "Not Available") if valuation_result else "Not Available"
+        st.info(f"**Valuation Standing:** {overall_val_status}")
 
-        recommendation = generate_recommendation(
-            financial_health["Financial Health Score"],
-            valuation_result["Valuation Score"],
-            margin_of_safety
-        )
+        st.subheader("📈 Intrinsic Value & Margin of Safety")
 
-    st.success("Analysis Completed Successfully ✅")
+        col1, col2 = st.columns(2)
 
-    st.divider()
+        with col1:
+            iv_val = intrinsic.get('Intrinsic Value') if intrinsic else None
+            st.metric(
+                "Intrinsic Value",
+                f"${iv_val:,.2f}" if iv_val is not None and iv_val > 0 else "Not Available"
+            )
 
-    st.subheader("📊 Financial Health")
+        with col2:
+            mos_val = intrinsic.get('Margin of Safety') if intrinsic else None
+            st.metric(
+                "Margin of Safety",
+                f"{mos_val:,.2f} %" if mos_val is not None else "Not Available"
+            )
 
-    col1, col2, col3 = st.columns(3)
+        st.divider()
 
-    with col1:
-        st.metric(
-            "Financial Health",
-            f"{financial_health['Financial Health Score']}/100"
-        )
+        # ----------------------------------
+        # AI Recommendation Section
+        # ----------------------------------
+        st.subheader("🤖 AI Investment Recommendation")
 
-    with col2:
-        st.metric(
-            "Profitability",
-            financial_health["Profitability Score"]
-        )
+        rec_title = recommendation.get("Recommendation", "N/A") if recommendation else "N/A"
+        rec_reason = recommendation.get("Reason", "No rationale provided.") if recommendation else "No rationale provided."
 
-    with col3:
-        st.metric(
-            "Liquidity",
-            financial_health["Liquidity Score"]
-        )
+        col1, col2 = st.columns([1, 2])
 
-    st.write("### Financial Score Breakdown")
+        with col1:
+            st.metric(
+                "Recommendation",
+                rec_title
+            )
 
-    st.dataframe(
-        pd.DataFrame(
-            financial_health.items(),
-            columns=["Metric", "Score"]
-        ),
-        use_container_width=True
-    )
+        with col2:
+            st.info(rec_reason)
 
-    st.subheader("📊 Financial Score Visualization")
-
-    chart_data = pd.DataFrame({
-        "Category": [
-            "Profitability",
-            "Growth",
-            "Debt",
-            "Liquidity",
-            "Cash Flow"
-        ],
-        "Score": [
-            financial_health["Profitability Score"],
-            financial_health["Growth Score"],
-            financial_health["Debt Score"],
-            financial_health["Liquidity Score"],
-            financial_health["Cash Flow Score"]
-        ]
-    })
-
-    fig = px.bar(
-        chart_data,
-        x="Category",
-        y="Score",
-        text="Score",
-        title="Financial Score Breakdown"
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-    st.divider()
-
-    st.subheader("💰 Valuation Analysis")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        current_price = valuation.get('Current Price')
-        st.metric(
-            "Current Price",
-            f"${current_price}" if current_price is not None else "N/A"
-        )
-
-        pe_ratio = valuation.get("P/E Ratio")
-        st.metric(
-            "P/E Ratio",
-            round(pe_ratio, 2) if pe_ratio is not None else "N/A"
-        )
-
-    with col2:
-        book_value = valuation.get('Book Value Per Share')
-        st.metric(
-            "Book Value Per Share",
-            f"${round(book_value, 2)}" if book_value is not None else "N/A"
-        )
-
-        pb_ratio = valuation.get("P/B Ratio")
-        st.metric(
-            "P/B Ratio",
-            round(pb_ratio, 2) if pb_ratio is not None else "N/A"
-        )
-
-    st.success(
-        valuation_result["Overall Valuation"]
-    )
-
-    st.write("### Valuation Details")
-
-    st.subheader("📈 Intrinsic Value")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        iv_val = intrinsic.get('Intrinsic Value', 0)
-        st.metric(
-            "Intrinsic Value",
-            f"${round(iv_val, 2)}" if iv_val else "N/A"
-        )
-
-    with col2:
-        mos_val = intrinsic.get('Margin of Safety', 0)
-        st.metric(
-            "Margin of Safety",
-            f"{round(mos_val, 2)} %" if mos_val else "N/A"
-        )
-
-    st.divider()
-
-    # ----------------------------------
-    # AI Recommendation
-    # ----------------------------------
-
-    st.subheader("🤖 AI Investment Recommendation")
-
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        st.metric(
-            "Recommendation",
-            recommendation["Recommendation"]
-        )
-
-    with col2:
-        st.info(
-            recommendation["Reason"]
-        )
-
-    st.divider()
+        st.divider()
 
 # ----------------------------------
 # Footer
 # ----------------------------------
 
 st.caption(
-    "Built using AI + Data Science + Core Finance Concepts"
+    "Built using AI + Data Science + Core Finance Concepts | Bloomberg Mini Terminal Edition"
 )
