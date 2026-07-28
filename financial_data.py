@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: financial_data.py
-# Version: 4.2 (Fully Compliant & Pickle-Serializable Edition)
+# Version: 4.3 (Robust Multi-Source Extraction Edition)
 # ==========================================
 
 import logging
@@ -15,6 +15,47 @@ logger = logging.getLogger(__name__)
 
 
 # ----------------------------------
+# Helper Extraction Functions
+# ----------------------------------
+
+def _normalize_key(key):
+    """Normalizes string keys for fuzzy/flexible matching."""
+    if not isinstance(key, str):
+        return ""
+    return "".join(c.lower() for c in key if c.isalnum())
+
+
+def _extract_from_statements(statements_list, target_keywords):
+    """
+    Searches a list of DataFrames (annual/quarterly balance sheets or cash flows)
+    using flexible keyword matching against index labels.
+    """
+    if not statements_list:
+        return None
+
+    for stmt in statements_list:
+        if stmt is None or stmt.empty:
+            continue
+        
+        # Iterate over columns (typically dates) and rows (metrics)
+        for idx in stmt.index:
+            norm_idx = _normalize_key(str(idx))
+            for kw in target_keywords:
+                if kw in norm_idx:
+                    # Get the most recent column (first column)
+                    for col in stmt.columns:
+                        val = stmt.loc[idx, col]
+                        if pd.notna(val):
+                            try:
+                                float_val = float(val)
+                                if float_val != 0.0:
+                                    return float_val
+                            except Exception:
+                                continue
+    return None
+
+
+# ----------------------------------
 # Fetch Company Financial Data
 # ----------------------------------
 
@@ -22,8 +63,8 @@ def get_company_financials(ticker):
     """
     Dynamically fetches live financial statements (Income Statement, 
     Balance Sheet, Cash Flow Statement) and attributes using yfinance 
-    with robust error handling, session headers, and fully pickle-serializable outputs.
-    Returns None for unavailable items instead of fake fallback values.
+    with robust fallback hierarchies, flexible row name matching, 
+    and fully pickle-serializable outputs.
     """
     try:
         # Use custom headers to avoid restrictions on cloud deployment environments (Streamlit Cloud)
@@ -41,12 +82,11 @@ def get_company_financials(ticker):
         try:
             fi = company.fast_info
             if fi is not None:
-                # Safely extract attributes from fast_info
                 fast_info_dict = dict(fi) if hasattr(fi, "keys") else {k: fi[k] for k in dir(fi) if not k.startswith("_")}
         except Exception as e:
             logger.warning(f"Could not fetch fast_info for {ticker}: {e}")
 
-        # info is already a standard Python dictionary
+        # info dictionary
         info = None
         try:
             info = company.info
@@ -100,6 +140,86 @@ def get_company_financials(ticker):
                 quarterly_cash_flow = q_cf.copy()
         except Exception as e:
             logger.warning(f"Could not fetch quarterly_cashflow for {ticker}: {e}")
+
+        # ----------------------------------
+        # Enhanced Multi-Source Data Extraction & Injection
+        # ----------------------------------
+        
+        # Ensure info is a dict for key insertions if valid
+        if info is None:
+            info = {}
+
+        # 1. Shares Outstanding Priority Extraction
+        shares_out = None
+        if fast_info_dict and "shares" in fast_info_dict:
+            shares_out = fast_info_dict.get("shares")
+        if not shares_out:
+            for key in ["sharesOutstanding", "impliedSharesOutstanding", "floatShares"]:
+                if info.get(key):
+                    shares_out = info.get(key)
+                    break
+        if shares_out:
+            info["sharesOutstanding"] = shares_out
+
+        # 2. Total Cash Priority Extraction (fast_info -> info -> balance sheets)
+        total_cash = None
+        if fast_info_dict:
+            for k in ["currency", "lastPrice", "marketCap"]: # bypass non-cash fields
+                pass
+            # check common fast_info keys if available
+            if "totalCash" in fast_info_dict:
+                total_cash = fast_info_dict.get("totalCash")
+        
+        if total_cash is None and info:
+            for key in ["totalCash", "cashAndCashEquivalents", "cashFinancial"]:
+                if info.get(key) is not None:
+                    total_cash = info.get(key)
+                    break
+
+        if total_cash is None:
+            cash_keywords = ["cashandcashequivalents", "cashcashequivalentsandshortterminvestments", "cash", "shortterminvestments"]
+            total_cash = _extract_from_statements([balance_sheet, quarterly_balance_sheet], cash_keywords)
+
+        if total_cash is not None:
+            info["totalCash"] = total_cash
+
+        # 3. Total Debt Priority Extraction (info -> balance sheets)
+        total_debt = None
+        if info:
+            for key in ["totalDebt", "shortLongTermDebtTotal", "longTermDebt"]:
+                if info.get(key) is not None:
+                    total_debt = info.get(key)
+                    break
+
+        if total_debt is None:
+            debt_keywords = ["totaldebt", "shortlongtermdebttotal", "longtermdebt", "currentdebt", "totalliabilities"]
+            total_debt = _extract_from_statements([balance_sheet, quarterly_balance_sheet], debt_keywords)
+
+        if total_debt is not None:
+            info["totalDebt"] = total_debt
+
+        # 4. Free Cash Flow / Operating Cash Flow & CapEx Extraction
+        fcf = None
+        if info and info.get("freeCashflow"):
+            fcf = info.get("freeCashflow")
+
+        if fcf is None:
+            fcf_keywords = ["freecashflow"]
+            fcf = _extract_from_statements([cash_flow, quarterly_cash_flow], fcf_keywords)
+
+        if fcf is None:
+            # Derive FCF = Operating Cash Flow + Capital Expenditures (Capex is typically negative)
+            ocf_keywords = ["operatingcashflow", "totalcashfromoperatingactivities", "cashflowfromoperatingactivities"]
+            capex_keywords = ["capitalexpenditures", "capitalexpenditure", "purchaseofpropertyplantandequipment", "capex"]
+            
+            ocf = _extract_from_statements([cash_flow, quarterly_cash_flow], ocf_keywords)
+            capex = _extract_from_statements([cash_flow, quarterly_cash_flow], capex_keywords)
+            
+            if ocf is not None and capex is not None:
+                fcf = ocf + capex if capex < 0 else ocf - capex
+
+        if fcf is not None:
+            info["freeCashflow"] = fcf
 
         logger.info(f"Successfully fetched financial statements for {ticker}")
 
