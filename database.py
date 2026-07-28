@@ -1,18 +1,19 @@
 import sqlite3
 import pandas as pd
 
-
 DATABASE_NAME = "investment_platform.db"
 
+
+# ----------------------------------
+# Create Company Table
+# ----------------------------------
 
 def create_company_table():
 
     connection = sqlite3.connect(DATABASE_NAME)
-
     cursor = connection.cursor()
 
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS companies
         (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,22 +22,21 @@ def create_company_table():
             sector TEXT,
             country TEXT
         )
-        """
-    )
+    """)
 
     connection.commit()
-
     connection.close()
 
 
+# ----------------------------------
+# Insert Companies
+# ----------------------------------
 
 def insert_companies_from_csv():
 
     connection = sqlite3.connect(DATABASE_NAME)
 
-    dataframe = pd.read_csv(
-        "data/companies.csv"
-    )
+    dataframe = pd.read_csv("data/companies.csv")
 
     dataframe.to_sql(
         "companies",
@@ -48,6 +48,9 @@ def insert_companies_from_csv():
     connection.close()
 
 
+# ----------------------------------
+# Get Companies
+# ----------------------------------
 
 def get_companies():
 
@@ -60,11 +63,21 @@ def get_companies():
 
     connection.close()
 
-    data = data[data["ticker"] != "TATAMOTORS.NS"]
+    # Remove Tata Motors from dropdown
+    data = data[
+        ~data["company_name"].str.contains(
+            "Tata",
+            case=False,
+            na=False
+        )
+    ]
 
-return data
+    return data
 
 
+# ----------------------------------
+# Company -> Ticker Mapping
+# ----------------------------------
 
 def get_company_ticker_mapping():
 
@@ -77,6 +90,14 @@ def get_company_ticker_mapping():
 
     connection.close()
 
+    # Remove Tata Motors
+    data = data[
+        ~data["company_name"].str.contains(
+            "Tata",
+            case=False,
+            na=False
+        )
+    ]
 
     company_dict = dict(
         zip(
