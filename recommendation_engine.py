@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: recommendation_engine.py
-# Version: 2.0
+# Version: 2.1
 # Status: Production Robust
 # ==========================================
 
@@ -14,14 +14,11 @@ def generate_recommendation(
     financial_health_score,
     valuation_score,
     margin_of_safety,
-    debt_score=None,
-    cash_flow_score=None,
-    profitability_score=None
+    **kwargs
 ):
     """
     Generates realistic investment recommendations (BUY, HOLD, or SELL)
-    by combining multiple fundamental pillars: Financial Health, Valuation Score,
-    Margin of Safety, Debt, Cash Flow, and Profitability.
+    by combining multiple fundamental pillars, supporting optional keyword arguments safely.
     """
     
     # Normalize scores and margins safely if they are None or strings
@@ -40,22 +37,14 @@ def generate_recommendation(
     except Exception:
         mos = -999.0
 
-    try:
-        d_score = float(debt_score) if debt_score is not None else 10.0
+    # Extract optional keyword arguments securely
+        d_score = float(kwargs.get("debt_score", 10.0) or 10.0)
+        cf_score = float(kwargs.get("cash_flow_score", 10.0) or 10.0)
+        p_score = float(kwargs.get("profitability_score", 15.0) or 15.0)
     except Exception:
-        d_score = 10.0
+        d_score, cf_score, p_score = 10.0, 10.0, 15.0
 
-    try:
-        cf_score = float(cash_flow_score) if cash_flow_score is not None else 10.0
-    except Exception:
-        cf_score = 10.0
-
-    try:
-        p_score = float(profitability_score) if profitability_score is not None else 10.0
-    except Exception:
-        p_score = 10.0
-
-    # 1. Strong / Conviction BUY: High financial quality, healthy profitability & cash flows, manageable debt, and positive margin of safety.
+    # 1. Strong / Conviction BUY
     if (
         f_score >= 70.0
         and v_score >= 20.0
@@ -69,7 +58,7 @@ def generate_recommendation(
             "Reason": "Exceptional financial strength, robust cash flows, solid profitability, and significant margin of safety."
         }
 
-    # 2. Standard BUY: Good overall health, decent valuation, and positive margin of safety.
+    # 2. Standard BUY
     elif (
         f_score >= 60.0
         and v_score >= 10.0
@@ -81,7 +70,7 @@ def generate_recommendation(
             "Reason": "Solid fundamentals, positive margin of safety, and acceptable debt levels make this an attractive entry point."
         }
 
-    # 3. Speculative / Margin-based BUY: Weak overall health score, but deeply undervalued with strong safety margin.
+    # 3. Speculative / Margin-based BUY
     elif (
         mos > 25.0
         and p_score >= 10.0
@@ -91,7 +80,7 @@ def generate_recommendation(
             "Reason": "Business quality is mixed, but the deep discount and high margin of safety present a potential value opportunity."
         }
 
-    # 4. HOLD / Neutral: Stable business or balanced metrics, but lacks clear margin of safety or has minor weakness in cash flows/debt.
+    # 4. HOLD / Neutral
     elif (
         f_score >= 50.0
         and v_score >= 10.0
@@ -102,7 +91,7 @@ def generate_recommendation(
             "Reason": "Business operations are stable, but current valuation or safety margins do not offer a compelling reason to buy or sell."
         }
 
-    # 5. DEFENSIVE HOLD: High financial health score, but currently overvalued or trading at a negative margin of safety.
+    # 5. DEFENSIVE HOLD
     elif (
         f_score >= 75.0
         and mos <= -15.0
@@ -112,7 +101,7 @@ def generate_recommendation(
             "Reason": "Company has stellar financial health, but the stock is currently expensive with a negative margin of safety."
         }
 
-    # 6. SELL: Weak fundamentals, high debt, poor cash flows, or extremely overvalued stock.
+    # 6. SELL
     else:
         return {
             "Recommendation": "🔴 SELL",
