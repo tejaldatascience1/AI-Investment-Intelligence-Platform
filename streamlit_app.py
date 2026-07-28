@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 3.8 (Production Display & Native UI Polish Edition)
+# Version: 3.9 (Production Display & Native UI Polish Edition)
 # ==========================================
 
 import streamlit as st
@@ -335,7 +335,7 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
             with col_e1:
                 st.metric(
                     "Enterprise Value",
-                    f"${business_val:,.0f}" if business_val is not None and business_val > 0 else "Not Available"
+                    f"${business_val:,.0f}" if business_val is not None else "Not Available"
                 )
 
             with col_e2:
@@ -355,7 +355,7 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                 iv_val = intrinsic.get('Intrinsic Value') if intrinsic else None
                 st.metric(
                     "Intrinsic Value",
-                    f"${iv_val:,.2f}" if iv_val is not None and iv_val > 0 else "Not Available"
+                    f"${iv_val:,.2f}" if iv_val is not None else "Not Available"
                 )
 
             with col_iv2:
