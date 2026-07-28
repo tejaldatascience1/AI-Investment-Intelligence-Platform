@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: financial_data.py
-# Version: 4.0 (Production Robust Edition)
+# Version: 4.1 (Optimized & Pickle-Serializable Edition)
 # ==========================================
 
 import logging
@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 def get_company_financials(ticker):
     """
     Dynamically fetches live financial statements (Income Statement, 
-    Balance Sheet, Cash Flow Statement) and fast info attributes using yfinance 
-    with robust error handling, session headers, and clean dictionary outputs.
+    Balance Sheet, Cash Flow Statement) and attributes using yfinance 
+    with robust error handling, session headers, and fully pickle-serializable outputs.
     Returns None for unavailable items instead of fake fallback values.
     """
     try:
@@ -36,47 +36,54 @@ def get_company_financials(ticker):
 
         company = yf.Ticker(ticker, session=session)
 
-        # Safely fetch fast_info and info attributes to guarantee fresh live market metrics
-        fast_info = None
-        info = None
-        income_statement = None
-        balance_sheet = None
-        cash_flow = None
-
+        # Safely fetch fast_info and convert to a standard dictionary to ensure pickle-serializability for st.cache_data
+        fast_info_dict = None
         try:
-            fast_info = company.fast_info
+            fi = company.fast_info
+            if fi is not None:
+                # fast_info acts like a dict or has keys we can iterate over safely
+                fast_info_dict = {k: fi[k] for k in fi}
         except Exception as e:
             logger.warning(f"Could not fetch fast_info for {ticker}: {e}")
 
+        # info is already a standard Python dictionary
+        info = None
         try:
             info = company.info
         except Exception as e:
             logger.warning(f"Could not fetch info dictionary for {ticker}: {e}")
 
+        # Convert DataFrames/Series to dictionaries or primitive formats if necessary, 
+        # or keep DataFrames since they are pickle-serializable, but dict representations 
+        # or clean copies prevent shared-reference and serialization mutation issues.
+        income_statement = None
         try:
             inc = company.financials
             if inc is not None and not inc.empty:
-                income_statement = inc
+                income_statement = inc.copy()
         except Exception as e:
             logger.warning(f"Could not fetch financials for {ticker}: {e}")
 
+        balance_sheet = None
         try:
             bs = company.balance_sheet
             if bs is not None and not bs.empty:
-                balance_sheet = bs
+                balance_sheet = bs.copy()
         except Exception as e:
             logger.warning(f"Could not fetch balance_sheet for {ticker}: {e}")
 
+        logger.info(f"Successfully fetched financial statements for {ticker}")
+        cash_flow = None
         try:
             cf = company.cashflow
             if cf is not None and not cf.empty:
-                cash_flow = cf
+                cash_flow = cf.copy()
         except Exception as e:
             logger.warning(f"Could not fetch cashflow for {ticker}: {e}")
 
-        # Construct clean dictionary output adhering to production and format constraints
+        # Construct clean, fully pickle-serializable dictionary output
         financial_data = {
-            "fast_info": fast_info,
+            "fast_info": fast_info_dict,
             "info": info,
             "income_statement": income_statement,
             "balance_sheet": balance_sheet,
