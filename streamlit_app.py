@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 3.1 (Production UI Refined)
+# Version: 3.2 (Optimized & Speed Enhanced)
 # ==========================================
 
 import streamlit as st
@@ -38,7 +38,7 @@ st.set_page_config(
 )
 
 # ----------------------------------
-# Custom UI Styling (Bloomberg Mini Terminal Look)
+# Custom UI Styling
 # ----------------------------------
 
 st.markdown("""
@@ -52,11 +52,21 @@ st.markdown("""
         padding: 15px;
         border-radius: 8px;
     }
-    .stDataFrame {
-        border-radius: 8px;
-    }
     </style>
 """, unsafe_allow_html=True)
+
+
+# ----------------------------------
+# Cached Data Loaders for Speed Optimization
+# ----------------------------------
+
+@st.cache_data(ttl=3600)
+def cached_get_company_financials(ticker):
+    return get_company_financials(ticker)
+
+@st.cache_data(ttl=3600)
+def cached_get_valuation_metrics(ticker):
+    return get_valuation_metrics(ticker)
 
 
 # ----------------------------------
@@ -76,7 +86,7 @@ st.divider()
 
 
 # ----------------------------------
-# Company Research Sidebar / Section
+# Company Research Section
 # ----------------------------------
 
 st.header("🏢 Company Research")
@@ -131,7 +141,8 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
     else:
         with st.spinner("Fetching financial statements and executing valuation engine..."):
             try:
-                financial_data = get_company_financials(selected_ticker)
+                # Use cached data fetchers to maximize loading speed
+                financial_data = cached_get_company_financials(selected_ticker)
 
                 profitability = calculate_profitability(financial_data)
                 growth = calculate_growth_and_debt(financial_data)
@@ -145,7 +156,7 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                     cashflow
                 )
 
-                valuation = get_valuation_metrics(selected_ticker)
+                valuation = cached_get_valuation_metrics(selected_ticker)
                 valuation_result = calculate_valuation_score(valuation)
                 intrinsic = calculate_intrinsic_value(selected_ticker, valuation)
 
@@ -166,7 +177,6 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                 f_score = financial_health.get("Financial Health Score", 0) if financial_health else 0
                 v_score = valuation_result.get("Valuation Score", 0) if valuation_result else 0
                 
-                # Extract extended scores if available for recommendation engine integration
                 debt_score_val = financial_health.get("Debt Score", 10) if financial_health else 10
                 cf_score_val = financial_health.get("Cash Flow Score", 10) if financial_health else 10
                 prof_score_val = financial_health.get("Profitability Score", 15) if financial_health else 15
