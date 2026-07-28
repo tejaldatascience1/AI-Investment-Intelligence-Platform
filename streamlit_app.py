@@ -1,7 +1,7 @@
 # ==========================================
 # AI Investment Intelligence Platform
 # File: streamlit_app.py
-# Version: 3.2 (Optimized & Speed Enhanced)
+# Version: 3.3 (Fixed & Cleaned)
 # ==========================================
 
 import streamlit as st
@@ -177,17 +177,11 @@ if st.button("🚀 Generate Investment Intelligence", type="primary", use_contai
                 f_score = financial_health.get("Financial Health Score", 0) if financial_health else 0
                 v_score = valuation_result.get("Valuation Score", 0) if valuation_result else 0
                 
-                debt_score_val = financial_health.get("Debt Score", 10) if financial_health else 10
-                cf_score_val = financial_health.get("Cash Flow Score", 10) if financial_health else 10
-                prof_score_val = financial_health.get("Profitability Score", 15) if financial_health else 15
-
+                # Removed extra keyword arguments to match the standard function signature perfectly
                 recommendation = generate_recommendation(
                     f_score,
                     v_score,
-                    margin_of_safety,
-                    debt_score=debt_score_val,
-                    cash_flow_score=cf_score_val,
-                    profitability_score=prof_score_val
+                    margin_of_safety
                 )
 
                 st.success("Analysis Completed Successfully ✅")
